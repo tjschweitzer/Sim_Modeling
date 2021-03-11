@@ -7,7 +7,7 @@ import matplotlib.animation as animation
 G = 9.8  # acceleration due to gravity, in m/s^2
 L1 = 1.0 # length of pendulum 1 in m
 L2 = 1.0  # length of pendulum 2 in m
-M1 = 2.0  # mass of pendulum 1 in kg
+M1 = 1.0  # mass of pendulum 1 in kg
 M2 = 1.0  # mass of pendulum 2 in kg
 
 
