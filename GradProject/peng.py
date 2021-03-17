@@ -1,87 +1,118 @@
-from numpy import sin, cos
+from __future__ import print_function
+from sympy import Dummy, lambdify
+from scipy.integrate import odeint
+
+import time
+import math
 import numpy as np
-import matplotlib.pyplot as plt
-import scipy.integrate as integrate
-import matplotlib.animation as animation
+import pylab as py
 
-G = 9.8  # acceleration due to gravity, in m/s^2
-L1 = 1.0 # length of pendulum 1 in m
-L2 = 1.0  # length of pendulum 2 in m
-M1 = 1.0  # mass of pendulum 1 in kg
-M2 = 1.0  # mass of pendulum 2 in kg
+# import matplotlib.pyplot as plt
 
+from matplotlib import animation, rc
+from IPython.display import HTML
+from matplotlib import pyplot as plt
 
-def derivs(state, t):
-
-    dydx = np.zeros_like(state)
-    dydx[0] = state[1]
-
-    delta = state[2] - state[0]
-    den1 = (M1+M2) * L1 - M2 * L1 * cos(delta) * cos(delta)
-    dydx[1] = ((M2 * L1 * state[1] * state[1] * sin(delta) * cos(delta)
-                + M2 * G * sin(state[2]) * cos(delta)
-                + M2 * L2 * state[3] * state[3] * sin(delta)
-                - (M1+M2) * G * sin(state[0]))
-               / den1)
-
-    dydx[2] = state[3]
-
-    den2 = (L2/L1) * den1
-    dydx[3] = ((- M2 * L2 * state[3] * state[3] * sin(delta) * cos(delta)
-                + (M1+M2) * G * sin(state[0]) * cos(delta)
-                - (M1+M2) * L1 * state[1] * state[1] * sin(delta)
-                - (M1+M2) * G * sin(state[2]))
-               / den2)
-
-    return dydx
-
-dt = 0.05 # time step
-t = np.arange(0, 20, dt) #time range
-
-# th1 and th2 are the initial angles (degrees)
-# w10 and w20 are the initial angular velocities (degrees per second)
-th1 = 120.0
-w1 = 0.0
-th2 = -10.0
-w2 = 0.0
-
-# initial state
-state = np.radians([th1, w1, th2, w2])
-
-# integrate your ODE using scipy.integrate.
-y = integrate.odeint(derivs, state, t)
-
-x1 = L1*sin(y[:, 0])
-y1 = -L1*cos(y[:, 0])
-
-x2 = L2*sin(y[:, 2]) + x1
-y2 = -L2*cos(y[:, 2]) + y1
-
-fig = plt.figure()
-ax = fig.add_subplot(111, autoscale_on=False, xlim=(-2, 2), ylim=(-2, 2))
-ax.set_aspect('equal')
-ax.grid()
-
-line, = ax.plot([], [], 'o-', lw=2)
-time_template = 'time = %.1fs'
-time_text = ax.text(0.05, 0.9, '', transform=ax.transAxes)
+from sympy.physics.mechanics import *
+import sympy as sy
 
 
-def init():
-    line.set_data([], [])
-    time_text.set_text('')
-    return line, time_text
 
 
-def animate(i):
-    thisx = [0, x1[i], x2[i]]
-    thisy = [0, y1[i], y2[i]]
 
-    line.set_data(thisx, thisy)
-    time_text.set_text(time_template % (i*dt))
-    return line, time_text
+# Genralized Variables
+n = 1
+q = dynamicsymbols(f'q:{n}')  # coordinates
+u = dynamicsymbols(f'u:{n}')  # speeds
+
+m = sy.symbols(f'm:{n}')  # Mass
+l = sy.symbols(f'l:{n}')  # Length
+
+g, t = sy.symbols('g, t')  # Gravity, time
+
+time =np.linspace(0, 10, 1000)
 
 
-ani = animation.FuncAnimation(fig, animate, range(1, len(y)),
-                              interval=dt*1000, blit=True, init_func=init)
+# Init model
+frame = ReferenceFrame('A')  # referance frame
+point = Point('P')  # pivot point
+point.set_vel(frame, 0)  # set velocity to pivot point to 0
+
+
+# Create a reference frame following the i^th mass
+frame_0 = frame.orientnew('A0', 'Axis', [q[0], frame.z])
+frame_0.set_ang_vel(frame, u[0] * frame_0.z)
+
+# Create a point in this reference frame
+point0 = point.locatenew('P0', l[0] * frame_0.x)
+point0.v2pt_theory(point, frame, frame_0)
+
+# Create a new particle of mass m[i] at this point
+Pa0 = Particle('Pa0', point0, m[0])
+bodies=Pa0
+
+# Set forces & compute kinematic ODE
+loads = point0, m[0] * g * frame_0.x
+kd_eqs = q[0].diff(t) - u[0]
+
+
+method = KanesMethod(frame, q_ind=q, u_ind=u, kd_eqs=[kd_eqs])
+fr, fr_star = method.kanes_equations([bodies],[loads])
+
+
+initial_positions = 3 * np.pi / 4
+initial_velocities = 0
+y0 = [initial_positions,initial_positions]
+lengths = [.5]
+masses = [1.]
+
+par = [g, l,m]
+par_val = [9.81,lengths,masses]
+
+dummy_symbols = [Dummy() for i in q + u]  # Create a dummy symbol for each variable
+dummy_dict = dict(zip(q + u, dummy_symbols))
+print(dummy_dict)
+kds = method.kindiffdict()
+
+# substitute unknown symbols for qdot terms
+mm_sym = method.mass_matrix_full.subs(kds).subs(dummy_dict)
+fo_sym = method.forcing_full.subs(kds).subs(dummy_dict)
+print(dummy_symbols + par)
+# create functions for numerical calculation
+mm_func = lambdify(dummy_symbols + par, mm_sym)
+fo_func = lambdify(dummy_symbols + par, fo_sym)
+
+
+def f(y, t, args):
+    print(f'y {y} args {args}')
+    vals = np.concatenate((y, args))
+    print(vals)
+    print(*vals)
+
+    sol = np.linalg.solve(mm_func(*vals), fo_func(*vals))
+
+    return np.array(sol).T[0]
+
+temp  = odeint(f, y0, time, args=(par_val,))
+
+def get_xy_coords(p, lengths):
+    """Get (x, y) coordinates from generalized coordinates p"""
+    # p = np.atleast_2d(p)
+    n = p.shape[1] // 2
+    print(f'n {n}')
+    zeros = np.zeros(p.shape[0])
+    print(zeros.shape, zeros.shape[0])
+
+    x  = np.hstack([zeros, lengths[0] * np.sin(p[:, :n])])
+    y = np.hstack([zeros, -lengths[0] * np.cos(p[:, :n])])
+
+
+    return np.cumsum(x, 1), np.cumsum(y, 1)
+
+x, y = get_xy_coords(temp,lengths)
+
+plt.plot(x,time)
+plt.plot(y,time)
+
 plt.show()
+
