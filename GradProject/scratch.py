@@ -2,7 +2,8 @@
 from sympy.physics.mechanics import *
 import  sympy as sy
 
-n=2
+n=3
+
 
 q = dynamicsymbols('q:' + str(n + 1))  # oordinates
 u = dynamicsymbols('u:' + str(n + 1))  # Generalized speeds
@@ -31,9 +32,12 @@ particles = [Pa0]                         # List to hold the n + 1 particles
 forces = [(P0, f * I.x - m[0] * g * I.y)] # List to hold the n + 1 applied forces, including the input force, f
 kindiffs = [q[0].diff(t) - u[0]]          # List to hold kinematic ODE's
 
+
+
 print(frames)
 for i in range(n):
-    Bi = I.orientnew('B' + str(i), 'Axis', [q[i + 1], I.z])   # Create a new frame
+    Bi = I.orientnew('B' + str(i), 'Axis', [q[i + 1], I.z])
+    print( [q[i + 1], I.z])# Create a new frame
     Bi.set_ang_vel(I, u[i + 1] * I.z)                         # Set angular velocity
     frames.append(Bi)                                         # Add it to the frames list
     Pi = points[-1].locatenew('P' + str(i + 1), l[i] * Bi.x)  # Create a new point
@@ -56,7 +60,7 @@ from numpy.linalg import solve
 from scipy.integrate import odeint
 
 arm_length = 1. / n                        # The maximum length of the pendulum is 1 meter
-bob_mass = 0.01 / n                          # The maximum mass of the bobs is 10 grams
+bob_mass = 1./n                         # The maximum mass of the bobs is 10 grams
 parameters = [g, m[0]]                       # Parameter definitions starting with gravity and the first bob
 parameter_vals = [9.81, bob_mass]            # Numerical values for the first two
 for i in range(n):                           # Then each mass and length
@@ -104,11 +108,7 @@ x0 = hstack((0, pi  * np.ones(len(q) - 1), 1e-10 * np.ones(len(u)) )) # Initial 
 
 t = linspace(0, 10, 1000)                                          # Time vector
 y = odeint(right_hand_side, x0, t, args=(parameter_vals,))
-print(f'y {y}')
-print(f'x_0 {x0}')
-print(f'parim {parameters}')
 
-print(f'parim_values {parameter_vals}')
 
 import matplotlib.pyplot as plt
 # lines = plt.plot(t, y[:, :y.shape[1] // 2])
