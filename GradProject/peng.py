@@ -56,23 +56,23 @@ class n_pendulum:
             point = point_i
 
         # make equations
-        method = KanesMethod(frame, q_ind=q, u_ind=u,                                   kd_eqs=kd_eqs)
+        method = KanesMethod(frame, q_ind=q, u_ind=u,
+                             kd_eqs=kd_eqs)
         (fr, fr_star) = method.kanes_equations(bodies=bodies, loads=loads)
         kds = method.kindiffdict()
+        print(fr)
+        print(fr_star)
 
-        # todo: make this dynamic
         if y0 is None:
-            y0 =  [np.pi/4]*n + [0]*n  #inial position and velocities
-
-
+            y0 =  [4*np.pi/8]*n + [0]*n  #inial position and velocities
         lengths = np.ones(n) /n # make all lengths sum to one
-        print(f'y0 {y0}')
-        print(f'length {lengths}')
         masses = [mass] * n
-        print(f'masses {masses}')
-
         parameters = [g] + list(l) + list(m)
         par_val = [9.81] + list(lengths) + list(masses)
+
+        print(f'y0 {y0}')
+        print(f'length {lengths}')
+        print(f'masses {masses}')
         print(f"par {parameters}")
         print(f'par_values {par_val}')
 
@@ -84,17 +84,19 @@ class n_pendulum:
         # substitute unknown symbols for qdot terms
         mm_sym = method.mass_matrix_full.subs(kds).subs(dummy_dict)
         fo_sym = method.forcing_full.subs(kds).subs(dummy_dict)
+        print(f'mass matrix {mm_sym}')
+        print(f'force vectors {fo_sym}')
 
         # create functions for numerical calculation
-        mm_func = lambdify(dummy_symbols + parameters, mm_sym)
-        fo_func = lambdify(dummy_symbols     + parameters, fo_sym)
+        mm_func = lambdify(dummy_symbols + parameters, mm_sym) #  function taking in symbols and peramitors
+        fo_func = lambdify(dummy_symbols + parameters, fo_sym) # force function taking in symbols and peramitors
 
         def f(y, t, args):
             vals = np.concatenate((y, args)) # combine variables
             dydt = np.array(np.linalg.solve(mm_func(*vals), fo_func(*vals))).T[0]  # solve mass matrix and force equations
 
             return dydt
-
+        ##double check rubrick###
         self.init_ode  = odeint(f, y0, times, args=(par_val,))
         temp = 0
 
@@ -115,31 +117,27 @@ def GPE(y,n):
     points = y[:,1:]
     gpe=np.zeros((len(points),n))
     for i in range(n):
-        gpe[:,i] = mass*9.8*(points[:,i]-(1/n*(i+1)))
+        gpe[:,i] = (mass*(n-i))*9.8*(points[:,i]+(1/n)*(i+1))
     return gpe
 
 def KE(ode_info,n):
     mass = 1
     ke_calc = np.square(ode_info[:,-n:])*mass
-    return ke_calc
+    return .5*ke_calc
 
-n=2
-time = np.linspace(0,5,500)
+n=5
+
+
+time = np.linspace(0,10,1000)
 app =n_pendulum(n,time,mass=1,length=1)
 x_data, y_data = get_xy_coords(app.init_ode)
 temp = GPE(y_data,n)
 ke_temp =KE(app.init_ode,n)
 
-kenergysum = np.sum(np.add(temp,ke_temp),axis=1)
+kenergysum = np.sum(np.add(ke_temp,temp),axis=1)
 
 # total_sum = np.sum(kenergysum)
 
-# plt.plot(time,temp[:,0])
-# plt.plot(time,temp[:,1])
-# plt.plot(time,ke_temp[:,0])
-# plt.plot(time,ke_temp[:,1])
-#
-# plt.show()
 
 fig, ax = plt.subplots(2,2,  figsize=(8, 6))
 
@@ -155,9 +153,13 @@ ax[0,0].set_ylim(-1.2,1.2)
 
 pen_plot = ax[0,0].scatter(x_data[0], y_data[0], zorder = 5) #Pendilum plot
 
-
-GPE_plot,  = ax[0, 1].plot([], [], lw=3)
-KE_plot, = ax[1, 0].plot([], [], lw=3)
+gpe_list = []
+ke_list =[]
+for i in range(n):
+    GPE_plot,  = ax[0, 1].plot([], [], lw=3)
+    KE_plot, = ax[1, 0].plot([], [], lw=3)
+    gpe_list.append(GPE_plot)
+    ke_list.append(KE_plot)
 
 totalE_plot, = ax[1, 1].plot([], [], lw=3)
 annotation=[]
@@ -173,8 +175,9 @@ for i in range(n):
 def animate(i) :
     pen_plot.set_offsets(np.c_[x_data[i,:], y_data[i,:]])
     tdata = time[:i]
-    GPE_plot.set_data(tdata,temp[:i,:])
-    KE_plot.set_data(tdata,ke_temp[:i,:])
+    for j in range(n):
+        gpe_list[j].set_data(tdata,temp[:i,j])
+        ke_list[j].set_data(tdata,ke_temp[:i,j])
     totalE_plot.set_data(tdata,kenergysum[:i])
     for j in range(1,n+1):
         annotation[j-1].set_position((x_data[i,j], y_data[i,j]))

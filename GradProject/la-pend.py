@@ -25,6 +25,7 @@ kde = sy.Matrix([q1d - u1])
 # Input the force resultant at P
 R = m*g*N.x
 
+
 A = N.orientnew('A', 'axis', [q1, N.z])
 A.set_ang_vel(N, q1d*N.z)
 P = pN.locatenew('P', L*A.x)
