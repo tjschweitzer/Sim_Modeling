@@ -58,8 +58,16 @@ class n_pendulum:
         # make equations
         method = KanesMethod(frame, q_ind=q, u_ind=u,
                              kd_eqs=kd_eqs)
+
         (fr, fr_star) = method.kanes_equations(bodies=bodies, loads=loads)
+        print("\n\n\nRHS")
+        for t in method.rhs('GE'):
+            print(t)
+        print()
         kds = method.kindiffdict()
+        for t in kds:
+            print(t)
+        print('\n\n')
         print(fr)
         print(fr_star)
 
@@ -113,20 +121,25 @@ def get_xy_coords(p):
     return np.cumsum(x, 1), np.cumsum(y, 1)
 
 def GPE(y,n):
-    mass =1
+    mass =[1]*n
     points = y[:,1:]
+
+    lengths = np.cumsum(np.ones(n)/n)
     gpe=np.zeros((len(points),n))
     for i in range(n):
-        gpe[:,i] = (mass*(n-i))*9.8*(points[:,i]+(1/n)*(i+1))
+        gpe[:,i] = np.sum(mass[:i+1])*-9.8*(points[:,i]+lengths[i])
     return gpe
 
 def KE(ode_info,n):
-    mass = 1
-    ke_calc = np.square(ode_info[:,-n:])*mass
-    return .5*ke_calc
+    mass = np.cumsum([1]*n)[::-1]
+    vel_vector = ode_info[:,-n:]
+    # KE_value =[]
+    # for i in range(len(vel_vector)):
+    #     KE_value.append( sum(0.5*vel_vector[i,:]**2))
+    ke_calc = .5*np.power(ode_info[:,-n:],2)*mass
+    return ke_calc
 
-n=5
-
+n=2
 
 time = np.linspace(0,10,1000)
 app =n_pendulum(n,time,mass=1,length=1)
@@ -139,7 +152,7 @@ kenergysum = np.sum(np.add(ke_temp,temp),axis=1)
 # total_sum = np.sum(kenergysum)
 
 
-fig, ax = plt.subplots(2,2,  figsize=(8, 6))
+fig, ax = plt.subplots(2,2,  figsize=(8, 8))
 
 
 ax[0,0].set_title(f'{n} pendulums ')
@@ -160,7 +173,7 @@ for i in range(n):
     KE_plot, = ax[1, 0].plot([], [], lw=3)
     gpe_list.append(GPE_plot)
     ke_list.append(KE_plot)
-
+# ax[1,1].set_ylim(-10,10)
 totalE_plot, = ax[1, 1].plot([], [], lw=3)
 annotation=[]
 for i in range(n):
