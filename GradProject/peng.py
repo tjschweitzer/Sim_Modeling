@@ -176,7 +176,7 @@ class n_pendulum:
         return ke_calc
 
 
-n = 3
+n = 2
 
 
 time = np.linspace(0, 20, 1000)
@@ -260,7 +260,7 @@ ani = animation.FuncAnimation(fig, animate, frames=len(x_data), interval=1, blit
 
 plt.show()
 from IPython.display import HTML
-# HTML(ani.to_html5_video())
+HTML(ani.to_html5_video())
 from matplotlib import collections
 
 def animate_pendulum_multiple(n, number_of_pendulums=20, perturbation=1E-3, track_length=15):
@@ -313,6 +313,7 @@ def animate_pendulum_multiple(n, number_of_pendulums=20, perturbation=1E-3, trac
     plt.close(fig)
     return anim
 
-
-# anim = animate_pendulum_multiple(2)
+#
+# anim = animate_pendulum_multiple(3)
+# anim.save('Crazy_tripple.mp4', extra_args=['-vcodec', 'libx264'])
 # HTML(anim.to_html5_video())
