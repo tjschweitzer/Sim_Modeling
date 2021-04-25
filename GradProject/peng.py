@@ -315,5 +315,5 @@ def animate_pendulum_multiple(n, number_of_pendulums=20, perturbation=1E-3, trac
 
 #
 # anim = animate_pendulum_multiple(3)
-# anim.save('Crazy_tripple.mp4', extra_args=['-vcodec', 'libx264'])
+# anim.save('Crazy_triple.mp4', extra_args=['-vcodec', 'libx264'])
 # HTML(anim.to_html5_video())
