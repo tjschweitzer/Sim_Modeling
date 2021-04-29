@@ -234,18 +234,20 @@ class SEIR_class:
         axs[0, 0].plot(dates, self.death_data[self.location]['deaths'], label='Observed', )
         axs[0, 0].plot(dates, weekly_deaths, label='Model')
         axs[0, 0].legend()
-        axs[0, 0].set_title('Recordered Deaths')
+        axs[0, 0].set_title('Recorded Deaths')
         for i in range(len(self.solution['y'])):
-            axs[1, 0].plot(self.death_data[self.location]['dates'], self.solution['y'][i], label=labels[i])
+            axs[1, 0].plot(dates,self.solution['y'][i], label=labels[i])
         axs[1, 0].legend()
         axs[0, 1].set_title('Ro')
-        axs[0,1].plot( Ro_plot)
-        axs[1, 1].plot(self.solution['y'][-2])
+        axs[0, 1].plot(dates, Ro_plot)
+        axs[1, 1].plot(dates,self.solution['y'][-2]/self.p['n'],c='k')
         axs[1, 1].set_title('')
         fig.set_figheight(15)
         fig.set_figwidth(15)
-        axs[1,1].hlines(1 -  (1 / np.max(Ro_plot[:10])),xmin=dates[0],xmax=dates[-1],label="heard imunity", colors='k')
-        plt.show()
+        print(dates[0],dates[-1])
+        axs[1, 1].axhline(1 -  (1 / np.max(Ro_plot[:10])),label="heard immunity")
+        axs[1, 1].legend()
+
 
         """ 
         create a 4 panel plot with the following views:
@@ -287,24 +289,27 @@ class SEIR_class:
                       death_rate=current_data['Death_rate'], Eo_frac=current_data['Eo'], degree=6,
                       coefs=current_data['C'], beta_o=.08)
 
+        dates = self.death_data[self.location]['dates']
         Ro_plot = self.beta_function(self.t_eval)*self.p["gamma"]
-        labels = ['Suseptable population', 'Exposed population', 'Infected population', 'Recovered population']
+        labels = ['Suseptable population', 'Exposed population', 'Infected population', 'Recovered population',
+                  'Dead population']
         fig, axs = plt.subplots(2, 2)
         axs[0, 0].plot(dates, self.death_data[self.location]['deaths'], label='Observed', )
         axs[0, 0].plot(dates, weekly_deaths, label='Model')
         axs[0, 0].legend()
-        axs[0, 0].set_title('Recordered Deaths')
-        for i in range(len(labels)):
-            axs[1, 0].plot(self.death_data[self.location]['dates'], self.solution['y'][i], label=labels[i])
+        axs[0, 0].set_title('Recorded Deaths')
+        for i in range(len(self.solution['y'])):
+            axs[1, 0].plot(dates,self.solution['y'][i], label=labels[i])
         axs[1, 0].legend()
-        axs[0, 1].set_title('Axis [1, 0]')
-        axs[0,1].plot( Ro_plot)
-        axs[1, 1].plot(self.solution['y'][-2]/ current_data["POPULATION"], 'tab:red')
-        axs[1, 1].set_title('Axis [1, 1]')
+        axs[0, 1].set_title('Ro')
+        axs[0, 1].plot(dates, Ro_plot)
+        axs[1, 1].plot(dates,self.solution['y'][-2]/self.p['n'],c='k')
+        axs[1, 1].set_title('')
         fig.set_figheight(15)
         fig.set_figwidth(15)
-        axs[1,1].plot((1 - np.ones(len(self.t_eval)) * (1 / np.max(Ro_plot[:10]))), c='k')
-        plt.show()
+        print(dates[0],dates[-1])
+        axs[1, 1].axhline(1 -  (1 / np.max(Ro_plot[:10])),label="heard imunity")
+        axs[1, 1].legend()
 
     def get_coefs_death_Eo(self,location):
         current_data = self.computed_dict[location]
