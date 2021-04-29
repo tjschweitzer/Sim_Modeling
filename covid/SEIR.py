@@ -240,11 +240,11 @@ class SEIR_class:
         axs[1, 0].legend()
         axs[0, 1].set_title('Ro')
         axs[0,1].plot( Ro_plot)
-        axs[1, 1].plot(self.solution['y'][-2], 'tab:red')
+        axs[1, 1].plot(self.solution['y'][-2])
         axs[1, 1].set_title('')
         fig.set_figheight(15)
         fig.set_figwidth(15)
-        axs[1,1].hlines(1 -  (1 / np.max(Ro_plot[:10])),xmin=dates[0],xmax=dates[-1], colors='k')
+        axs[1,1].hlines(1 -  (1 / np.max(Ro_plot[:10])),xmin=dates[0],xmax=dates[-1],label="heard imunity", colors='k')
         plt.show()
 
         """ 
@@ -260,6 +260,18 @@ class SEIR_class:
 
     def get_all_locations(self):
         return self.death_data.keys()
+
+    def get_all_ro(self):
+        Ro= {}
+        for location in self.computed_dict.keys():
+            self.set_location(location)
+            C = self.computed_dict[location]['C']
+            ro = Polynomial.basis(deg=6, domain=[0,self.t_eval[-1]])
+            ro.coef =C
+            ro_eval = ro(self.t_eval)*15
+            # print(ro_eval)
+            Ro[location] = 1-(1 / np.max(ro_eval[:10]))
+        return Ro
 
     def plot_location(self, location):
         self.set_location(location)
