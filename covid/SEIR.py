@@ -110,15 +110,13 @@ class SEIR_class:
         N = self.p['n']
         death = self.p['death_rate']
 
-        S, E, I, R = y[:4]
+        S, E, I= y[:3]
 
-        # Compute terms in the system of ODE. Do this now since we repeat computations
         beta_eval = beta(t)
         S_change = (beta_eval * S * (I + q * E)) / N
         E_change = E / delta
         I_change = I / gamma
 
-        # Compute derivatives with terms above
         dS = -S_change
         dE = S_change - E_change
         dI = E_change - I_change
@@ -146,8 +144,6 @@ class SEIR_class:
         self.N = float(self.population_dict[location].replace(",", ""))
         self.deaths = self.death_data[location]['deaths']
         self.deaths_cumsum = np.cumsum(self.deaths)
-        # print(self.deaths)
-        # print(self.deaths_cumsum)
         self.p['n']=self.N
         self.t_eval = np.array([(date - self.start_date).days for date in self.death_data[self.location]['dates']],
                                dtype=int)
@@ -242,14 +238,14 @@ class SEIR_class:
         for i in range(len(self.solution['y'])):
             axs[1, 0].plot(self.death_data[self.location]['dates'], self.solution['y'][i], label=labels[i])
         axs[1, 0].legend()
-        axs[0, 1].set_title('Axis [1, 0]')
+        axs[0, 1].set_title('Ro')
         axs[0,1].plot( Ro_plot)
         axs[1, 1].plot(self.solution['y'][-2], 'tab:red')
-        axs[1, 1].set_title('Axis [1, 1]')
+        axs[1, 1].set_title('')
         fig.set_figheight(15)
         fig.set_figwidth(15)
-        axs[0,1].hlines(1 -  (1 / np.max(Ro_plot[:10])),xmin=dates[0],xmax=dates[-1], colors='k')
-
+        axs[1,1].hlines(1 -  (1 / np.max(Ro_plot[:10])),xmin=dates[0],xmax=dates[-1], colors='k')
+        plt.show()
 
         """ 
         create a 4 panel plot with the following views:
@@ -347,5 +343,3 @@ if __name__== "__main__":
     data_temp = pandas.DataFrame.from_records(data_results)
     pandas.to_pickle(data_temp, "data_file.pkl")
 
-    # temp.to_pickle("dummy.pkl")
-    # pickle.dump( results, open( "all_location_save.p", "wb" ))
