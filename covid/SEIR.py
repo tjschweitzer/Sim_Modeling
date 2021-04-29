@@ -7,7 +7,7 @@ from scipy.integrate import solve_ivp
 import scipy
 import math
 import numpy as np
-
+import prettytable
 from numpy.polynomial.polynomial import Polynomial
 from scipy import integrate
 from scipy import optimize
@@ -16,13 +16,14 @@ from scipy import optimize
 # from numpy import polynomial as Polynomial
 class SEIR_class:
 
-    def __init__(self):
+    def __init__(self, filename):
         covid_filename = 'Provisional_COVID-19_Death_Counts_by_Week_Ending_Date_and_State.csv'
         pop_filename = 'Population.csv'
         self.death_data = {}
         self.population_dict = {}
         self.p= dict()
-
+        self.computed_data = pd.read_pickle(filename)
+        self.computed_dict= self.computed_data.set_index('NAME').T.to_dict('dict')
         raw_data = pd.read_csv(covid_filename, header=0, parse_dates=['End Date'])
 
         for i in range(len(raw_data)):
@@ -70,12 +71,11 @@ class SEIR_class:
 
         if coefs is None:
             self.beta_function = Polynomial.fit(self.t_eval,[beta_o]*self.t_eval,deg=degree)
-
-
         else:
             self.beta_function = Polynomial.basis(deg=degree, domain=[0,self.t_eval[-1]])
             self.beta_function.coef =coefs
             self.p['coefs']=coefs
+        self.p['Eo_frac']=Eo_frac
 
         self.p['beta']=self.beta_function
         self.p['q'] = q
@@ -146,12 +146,11 @@ class SEIR_class:
         self.N = float(self.population_dict[location].replace(",", ""))
         self.deaths = self.death_data[location]['deaths']
         self.deaths_cumsum = np.cumsum(self.deaths)
-        print(self.deaths)
-        print(self.deaths_cumsum)
+        # print(self.deaths)
+        # print(self.deaths_cumsum)
         self.p['n']=self.N
         self.t_eval = np.array([(date - self.start_date).days for date in self.death_data[self.location]['dates']],
                                dtype=int)
-        loaded_data=pandas.read_pickle('dummy.pkl')
 
 
     def get_SSE(self, opt_params):
@@ -163,22 +162,23 @@ class SEIR_class:
         """
 
 
-        self.set_parameter(death_rate=opt_params[-1],coefs=opt_params[:-1])
+        self.set_parameter(death_rate=opt_params[-1],coefs=opt_params[:-2],Eo_frac=opt_params[-2])
 
-        beta_results = self.beta_function(self.t_eval)
-        if any(beta_results) < 0:
-            print("Beta F Failed")
+        beta_results = [i<0 for i in self.beta_function(self.t_eval)]
+
+        if any(beta_results):
+            # print("Beta F Failed")
             return 1e26
 
         if self.p['death_rate'] < 0:
-            print("Death rate Failed")
+            # print("Death rate Failed")
             return 1e26
 
         try:
             self.solution = solve_ivp(self.SEIRD, (0., self.t_eval[-1]), self.y0, "BDF",
                                       self.t_eval, dense_output=True)
         except:
-            print("Try failed")
+            # print("Try failed")
             return 1e26
 
         sol_deaths = np.array(self.solution.y.T[:, 4])
@@ -189,8 +189,8 @@ class SEIR_class:
         else:
             sse_iter = 1e26
 
-            print(f"Size error {np.array(self.death_data[self.location]['deaths']).shape}  { sol_deaths.shape}")
-        print(f"{self.location}  Sum Square Error {sse_iter}")
+            # print(f"Size error {np.array(self.death_data[self.location]['deaths']).shape}  { sol_deaths.shape}")
+        # print(f"{self.location}  Sum Square Error {sse_iter}")
         return sse_iter
 
 
@@ -198,9 +198,13 @@ class SEIR_class:
     def get_minimize(self, opt_params, options, method='nelder-mead'):
 
         death_rate = opt_params[-1]
-        coefs = opt_params[:-1]
 
-        self.set_parameter(q=.5, delta=7, gamma=15, Eo_frac=1e-6, coefs=coefs, death_rate=death_rate, degree=6)
+
+        Eo_frac = opt_params[-2]
+
+        coefs = opt_params[:-2]
+
+        self.set_parameter(q=.5, delta=7, gamma=15, Eo_frac=Eo_frac, coefs=coefs, death_rate=death_rate, degree=6)
 
         res = minimize(self.get_SSE, opt_params, method=method,
                        options=options)
@@ -244,7 +248,7 @@ class SEIR_class:
         axs[1, 1].set_title('Axis [1, 1]')
         fig.set_figheight(15)
         fig.set_figwidth(15)
-        axs[1,1].plot(1 - np.ones(len(self.t_eval)) * (1 / np.max(Ro_plot[:10])), c='k')
+        axs[0,1].hlines(1 -  (1 / np.max(Ro_plot[:10])),xmin=dates[0],xmax=dates[-1], colors='k')
 
 
         """ 
@@ -261,41 +265,87 @@ class SEIR_class:
     def get_all_locations(self):
         return self.death_data.keys()
 
+    def plot_location(self, location):
+        self.set_location(location)
+        current_data = self.computed_dict[location]
+        # print(current_data)
+        self.solution = current_data['solutions']
 
-app = SEIR_class()
-all_locs = app.get_all_locations()
-deaths_results = []
-Ro_Results= []
-data_results = []
-for locs in all_locs:
-    print(locs)
-    try:
-        start_perams = [ 0.09347525,  0.05559237, -0.0764554,   0.12855742,  0.47815674, -0.13081831, -0.13717843,  0.00148614]
+        weekly_deaths= self.cumsum_to_weekly( self.solution.y[-1,:])
 
-        powell_options = {'disp': True, "xtol": 1e-6}
-        app.set_location(locs)
-        result =app.get_minimize(start_perams,powell_options,"Powell")
-        nm_options = {'xatol': 1e-7, 'adaptive': True}
+        dates = self.death_data[self.location]['dates']
+        print(f" Eo {current_data['Eo']}   Death Rate{current_data['Death_rate']}    C  {current_data['C']}")
+        self.set_parameter( q=.5, delta=6, gamma=16,
+                      death_rate=current_data['Death_rate'], Eo_frac=current_data['Eo'], degree=6,
+                      coefs=current_data['C'], beta_o=.08)
 
-        result = app.get_minimize(result.x, nm_options, "nelder-mead")
-        result = app.get_minimize(result.x, nm_options, "nelder-mead")
-        # app.plot_results()
+        Ro_plot = self.beta_function(self.t_eval)*self.p["gamma"]
+        labels = ['Suseptable population', 'Exposed population', 'Infected population', 'Recovered population']
+        fig, axs = plt.subplots(2, 2)
+        axs[0, 0].plot(dates, self.death_data[self.location]['deaths'], label='Observed', )
+        axs[0, 0].plot(dates, weekly_deaths, label='Model')
+        axs[0, 0].legend()
+        axs[0, 0].set_title('Recordered Deaths')
+        for i in range(len(labels)):
+            axs[1, 0].plot(self.death_data[self.location]['dates'], self.solution['y'][i], label=labels[i])
+        axs[1, 0].legend()
+        axs[0, 1].set_title('Axis [1, 0]')
+        axs[0,1].plot( Ro_plot)
+        axs[1, 1].plot(self.solution['y'][-2]/ current_data["POPULATION"], 'tab:red')
+        axs[1, 1].set_title('Axis [1, 1]')
+        fig.set_figheight(15)
+        fig.set_figwidth(15)
+        axs[1,1].plot((1 - np.ones(len(self.t_eval)) * (1 / np.max(Ro_plot[:10]))), c='k')
+        plt.show()
 
-    except:
-        continue
-    Ro_Results.append({"NAME":locs, "Ro_max":max(app.beta_function(app.t_eval)[:10])})
-    data_results.append({"NAME":locs,'C1':app.p['coefs'][0],'C2':app.p['coefs'][1],'C3':app.p['coefs'][2],'C4':app.p['coefs'][3],
-                         'C5':app.p['coefs'][4],'C6':app.p['coefs'][5],'C7':app.p['coefs'][6],'Death_rate':app.p['death_rate']})
-    deaths_results.append( {"NAME": locs, "Deaths": app.deaths_cumsum[-1]})
-    print(result.x)
+    def get_coefs_death_Eo(self,location):
+        current_data = self.computed_dict[location]
+        return current_data["C"], [current_data['Death_rate']],[current_data['Eo']]
 
-deathstemp = pandas.DataFrame.from_records(deaths_results,columns=['Name',"Deaths"])
-pandas.to_pickle(deathstemp,"death_file.pkl")
-rotemp = pandas.DataFrame.from_records(Ro_Results,columns=['Name',"Ro_max"])
-pandas.to_pickle(rotemp,"ro_file.pkl")
+    def plot_mcmc(self, location,x):
+        self.set_location(location)
 
-data_temp = pandas.DataFrame.from_records(data_results)
-pandas.to_pickle(data_temp,"data_file.pkl")
+        Eo = x[-1]
+        death_rate = x[-2]
+        C = x[:-2]
+        self.set_parameter(Eo_frac=Eo,death_rate=death_rate,coefs=C)
+        self.solution = solve_ivp(self.SEIRD, (0., self.t_eval[-1]), self.y0, "BDF",
+                                  self.t_eval, dense_output=True)
+        self.plot_results()
+if __name__== "__main__":
+    app = SEIR_class("data_file_temp.pkl")
+    # app.plot_location('Utah')
+    # app = SEIR_class("data_file.pkl")
+    # app.plot_location('Utah')
 
-# temp.to_pickle("dummy.pkl")
-# pickle.dump( results, open( "all_location_save.p", "wb" ))
+    all_locs = app.get_all_locations()
+    deaths_results = []
+    Ro_Results= []
+    data_results = []
+    print(all_locs)
+    for locs in all_locs:
+        print(locs)
+        try:
+            start_perams = [ 0.09347525,  0.05559237, -0.0764554,   0.12855742,  0.47815674, -0.13081831, -0.13717843,1E-6 ,  0.00148614]
+
+            powell_options = {'disp': True, "xtol": 1e-6}
+            app.set_location(locs)
+            result =app.get_minimize(start_perams,powell_options,"Powell")
+            nm_options = {'xatol': 1e-7, 'adaptive': True}
+
+            result = app.get_minimize(result.x, nm_options, "nelder-mead")
+            result = app.get_minimize(result.x, nm_options, "nelder-mead")
+            # app.plot_results()
+
+            solution = app.solution
+
+        except:
+            continue
+        data_results.append({"NAME":locs, "Ro_max":max(app.beta_function(app.t_eval)[:10]), "POPULATION":app.p['n'],
+                             'C':app.p['coefs'],'Eo':app.p['Eo_frac'],'Death_rate':app.p['death_rate'], "DEATHS": app.deaths_cumsum[-1],'solutions' : solution})
+
+    data_temp = pandas.DataFrame.from_records(data_results)
+    pandas.to_pickle(data_temp, "data_file.pkl")
+
+    # temp.to_pickle("dummy.pkl")
+    # pickle.dump( results, open( "all_location_save.p", "wb" ))
