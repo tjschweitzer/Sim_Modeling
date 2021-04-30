@@ -325,6 +325,8 @@ class SEIR_class:
         self.solution = solve_ivp(self.SEIRD, (0., self.t_eval[-1]), self.y0, "BDF",
                                   self.t_eval, dense_output=True)
         self.plot_results()
+
+
 if __name__== "__main__":
     app = SEIR_class("data_file_temp.pkl")
     # app.plot_location('Utah')
